@@ -13,7 +13,14 @@ import {
   PlusCircle,
   FileImage,
   X,
-  AlertCircle
+  AlertCircle,
+  Wallet,
+  TrendingUp,
+  ShieldCheck,
+  CheckCircle,
+  HelpCircle,
+  Users,
+  Home
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -76,21 +83,45 @@ const Dashboard = () => {
     fetchActivities();
   }, [user?.activeRoomId]);
 
-  // Calculate my balance details
+  // Calculate my settle net balance
   const myBalanceDetails = balances.find(b => b.user?._id === user?._id);
   const myNetBalance = myBalanceDetails ? myBalanceDetails.netBalance : 0;
-  const myTotalPaid = myBalanceDetails ? myBalanceDetails.totalPaid : 0;
 
-  // Calculate total room expenses
-  const totalRoomExpenses = balances.reduce((sum, b) => sum + (b.totalPaid || 0), 0);
-
-  // Prepare Recharts Category Data
-  const categories = {};
-  // Let's populate mock if empty, but retrieve actual from dashboard stats when available.
-  // We can calculate from all expenses or just show actuals. Let's fetch the summary from the backend for charts.
+  // Retrieve dashboard summary metrics
   const [summaryData, setSummaryData] = useState({
     categoryBreakdown: [],
-    topContributors: []
+    topContributors: [],
+    roomBudget: {
+      totalMembers: 0,
+      roomRent: 0,
+      rentShare: 0,
+      monthlyContribution: 0,
+      totalRoomExpenses: 0,
+      totalRemainingBudget: 0,
+      totalExtraExpenses: 0,
+    },
+    myBudget: {
+      allocatedBudget: 0,
+      rentShare: 0,
+      spent: 0,
+      remaining: 0,
+      extra: 0,
+      status: 'Within Budget',
+    },
+    memberTable: [],
+    charts: {
+      categoryPie: [],
+      memberBar: [],
+      topCategories: [],
+      topMembers: [],
+    },
+    insights: {
+      highestCategory: { name: 'None', value: 0 },
+      highestSpender: { name: 'None', spent: 0 },
+      efficientMember: { name: 'None', remaining: 0 },
+      totalRemainingBudget: 0,
+      overspendingAlerts: [],
+    }
   });
 
   useEffect(() => {
@@ -157,6 +188,10 @@ const Dashboard = () => {
       setAmount('');
       setCategory('Other');
       setReceiptFile(null);
+      
+      // Re-fetch summary data to update budget metrics
+      const sumRes = await api.get('/dashboard/summary');
+      setSummaryData(sumRes.data.summary);
     } catch (err) {
       console.error(err);
       setModalError(err.response?.data?.message || 'Failed to log expense');
@@ -191,121 +226,184 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* 2. Metric Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Card 1: Total Room Spending */}
-        <div className="glass-card p-5 rounded-2xl">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Room Spend</span>
-            <div className="h-8 w-8 bg-brand-500/10 rounded-lg flex items-center justify-center text-brand-400">
-              <Receipt className="h-4 w-4" />
+      {/* 2. My Budget Dashboard */}
+      <div>
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">My Budget Status</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+          {/* Allocated Budget */}
+          <div className="glass-card p-5 rounded-2xl">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">Allocated Budget</span>
+              <div className="h-8 w-8 bg-brand-500/10 rounded-lg flex items-center justify-center text-brand-400">
+                <Wallet className="h-4 w-4" />
+              </div>
             </div>
+            <p className="text-2xl font-black text-white mt-3">₹{(summaryData.myBudget?.allocatedBudget || 0).toLocaleString('en-IN')}</p>
+            <p className="text-[10px] text-slate-500 mt-1">Your monthly contribution</p>
           </div>
-          <p className="text-2xl font-black text-white mt-3">₹{totalRoomExpenses.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
-          <p className="text-[10px] text-slate-500 mt-1">Sum of all active room bills</p>
-        </div>
 
-        {/* Card 2: Your Total Paid */}
-        <div className="glass-card p-5 rounded-2xl">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">You Paid</span>
-            <div className="h-8 w-8 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-400">
-              <DollarSign className="h-4 w-4" />
+          {/* Rent Share */}
+          <div className="glass-card p-5 rounded-2xl">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">Rent Share</span>
+              <div className="h-8 w-8 bg-indigo-550/15 rounded-lg flex items-center justify-center text-indigo-400">
+                <Home className="h-4 w-4" />
+              </div>
             </div>
+            <p className="text-2xl font-black text-white mt-3">₹{(summaryData.myBudget?.rentShare || 0).toLocaleString('en-IN')}</p>
+            <p className="text-[10px] text-slate-500 mt-1">Deducted from budget</p>
           </div>
-          <p className="text-2xl font-black text-white mt-3">₹{myTotalPaid.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
-          <p className="text-[10px] text-slate-500 mt-1">Your absolute spending in room</p>
-        </div>
 
-        {/* Card 3: Net Balance */}
-        <div className={`glass-card p-5 rounded-2xl border ${myNetBalance > 0.01 ? 'border-emerald-500/20' : myNetBalance < -0.01 ? 'border-rose-500/20' : 'border-slate-800/50'}`}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Net Balance</span>
-            <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
-              myNetBalance > 0.01 
-                ? 'bg-emerald-500/10 text-emerald-400' 
-                : myNetBalance < -0.01 
-                  ? 'bg-rose-500/10 text-rose-400' 
-                  : 'bg-slate-800 text-slate-400'
-            }`}>
-              {myNetBalance > 0.01 ? <ArrowUpRight className="h-4 w-4" /> : myNetBalance < -0.01 ? <ArrowDownLeft className="h-4 w-4" /> : <DollarSign className="h-4 w-4" />}
+          {/* Spent (Expenses) */}
+          <div className="glass-card p-5 rounded-2xl">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Expenses</span>
+              <div className="h-8 w-8 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-400">
+                <TrendingUp className="h-4 w-4" />
+              </div>
             </div>
+            <p className="text-2xl font-black text-white mt-3">₹{(summaryData.myBudget?.spent || 0).toLocaleString('en-IN')}</p>
+            <p className="text-[10px] text-slate-500 mt-1">Your spent this month</p>
           </div>
-          <p className={`text-2xl font-black mt-3 ${myNetBalance > 0.01 ? 'text-emerald-400' : myNetBalance < -0.01 ? 'text-rose-400' : 'text-slate-300'}`}>
-            {myNetBalance > 0.01 ? '+' : ''}₹{Math.abs(myNetBalance).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-          </p>
-          <p className="text-[10px] text-slate-500 mt-1">
-            {myNetBalance > 0.01 ? 'You will receive from roommates' : myNetBalance < -0.01 ? 'You owe your roommates' : 'You are completely settled!'}
-          </p>
+
+          {/* Remaining */}
+          <div className="glass-card p-5 rounded-2xl">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Remaining</span>
+              <div className="h-8 w-8 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-400">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-black text-white mt-3">₹{(summaryData.myBudget?.remaining || 0).toLocaleString('en-IN')}</p>
+            <p className="text-[10px] text-slate-500 mt-1">Available balance</p>
+          </div>
+
+          {/* Extra Spending */}
+          <div className={`glass-card p-5 rounded-2xl border ${summaryData.myBudget?.extra > 0 ? 'border-danger-500/20 bg-danger-950/5' : 'border-slate-800/50'}`}>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Extra</span>
+              <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${summaryData.myBudget?.extra > 0 ? 'bg-danger-500/10 text-danger-400' : 'bg-slate-850 text-slate-550'}`}>
+                <AlertCircle className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="flex items-baseline space-x-1.5 mt-3">
+              <p className="text-2xl font-black text-white">₹{(summaryData.myBudget?.extra || 0).toLocaleString('en-IN')}</p>
+              {summaryData.myBudget?.extra > 0 && (
+                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-danger-500/10 border border-danger-500/20 text-danger-400">
+                  ⚠ Over Budget
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1">Exceeded budget limit</p>
+          </div>
         </div>
       </div>
 
-      {/* 3. Charts Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Chart A: Spending Breakdown */}
-        <div className="glass-panel p-5 rounded-2xl flex flex-col h-80">
-          <h2 className="text-sm font-bold text-slate-200">Category Breakdown</h2>
-          <div className="flex-1 mt-4 relative">
-            {summaryData.categoryBreakdown.length === 0 ? (
-              <div className="absolute inset-0 flex items-center justify-center text-xs text-slate-500">
-                No expense categories logged yet.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={summaryData.categoryBreakdown}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={85}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {summaryData.categoryBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px' }}
-                    itemStyle={{ color: '#fff', fontSize: '12px' }}
-                  />
-                  <Legend 
-                    layout="vertical" 
-                    align="right" 
-                    verticalAlign="middle"
-                    iconType="circle"
-                    formatter={(value) => <span className="text-xs text-slate-300">{value}</span>}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
+      {/* 2.5 Room Budget Overview */}
+      <div>
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Room Dashboard Overview</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-7 gap-4">
+          {/* Members */}
+          <div className="glass-card p-4 rounded-2xl">
+            <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">Total Members</span>
+            <p className="text-lg font-black text-white mt-1">{(summaryData.roomBudget?.totalMembers || 0)}</p>
+            <p className="text-[8px] text-slate-550 mt-0.5">Active in room</p>
+          </div>
+
+          {/* Room Rent */}
+          <div className="glass-card p-4 rounded-2xl">
+            <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">Room Rent</span>
+            <p className="text-lg font-black text-white mt-1">₹{(summaryData.roomBudget?.roomRent || 0).toLocaleString('en-IN')}</p>
+            <p className="text-[8px] text-slate-550 mt-0.5">Total monthly rent</p>
+          </div>
+
+          {/* Rent Share Per Person */}
+          <div className="glass-card p-4 rounded-2xl">
+            <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">Rent Share</span>
+            <p className="text-lg font-black text-white mt-1">₹{(summaryData.roomBudget?.rentShare || 0).toLocaleString('en-IN')}</p>
+            <p className="text-[8px] text-slate-550 mt-0.5">Rent share per person</p>
+          </div>
+
+          {/* Monthly Contribution Per Person */}
+          <div className="glass-card p-4 rounded-2xl">
+            <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">Contribution</span>
+            <p className="text-lg font-black text-white mt-1">₹{(summaryData.roomBudget?.monthlyContribution || 0).toLocaleString('en-IN')}</p>
+            <p className="text-[8px] text-slate-550 mt-0.5">Allocated budget</p>
+          </div>
+
+          {/* Total Room Expenses */}
+          <div className="glass-card p-4 rounded-2xl">
+            <span className="text-[9px] font-bold text-slate-455 uppercase tracking-wider">Room Expenses</span>
+            <p className="text-lg font-black text-white mt-1">₹{(summaryData.roomBudget?.totalRoomExpenses || 0).toLocaleString('en-IN')}</p>
+            <p className="text-[8px] text-slate-550 mt-0.5">Recorded this month</p>
+          </div>
+
+          {/* Total Remaining Budget */}
+          <div className="glass-card p-4 rounded-2xl">
+            <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">Remaining Pool</span>
+            <p className="text-lg font-black text-emerald-400 mt-1">₹{(summaryData.roomBudget?.totalRemainingBudget || 0).toLocaleString('en-IN')}</p>
+            <p className="text-[8px] text-slate-550 mt-0.5">Room unspent budget</p>
+          </div>
+
+          {/* Total Extra Expenses */}
+          <div className={`glass-card p-4 rounded-2xl border ${summaryData.roomBudget?.totalExtraExpenses > 0 ? 'border-danger-500/20' : 'border-slate-800/50'}`}>
+            <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">Extra Expenses</span>
+            <p className={`text-lg font-black mt-1 ${summaryData.roomBudget?.totalExtraExpenses > 0 ? 'text-danger-400' : 'text-slate-350'}`}>
+              ₹{(summaryData.roomBudget?.totalExtraExpenses || 0).toLocaleString('en-IN')}
+            </p>
+            <p className="text-[8px] text-slate-550 mt-0.5">Total roommate excesses</p>
           </div>
         </div>
+      </div>
 
-        {/* Chart B: Room Contributor stats */}
-        <div className="glass-panel p-5 rounded-2xl flex flex-col h-80">
-          <h2 className="text-sm font-bold text-slate-200">Who Paid What</h2>
-          <div className="flex-1 mt-4 relative">
-            {summaryData.topContributors.length === 0 ? (
-              <div className="absolute inset-0 flex items-center justify-center text-xs text-slate-500">
-                No roommate paid items yet.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={summaryData.topContributors.map(c => ({ name: c.user?.name || 'Unknown', Paid: c.totalPaid }))}>
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px' }}
-                    itemStyle={{ color: '#fff', fontSize: '12px' }}
-                  />
-                  <Bar dataKey="Paid" fill="#6366f1" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
+      {/* 3. Member Table Grid */}
+      <div className="glass-panel p-5 rounded-2xl">
+        <h2 className="text-sm font-bold text-slate-200 border-b border-slate-800 pb-3 mb-4">Member Budget & Spending Table</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-800 text-[10px] text-slate-400 uppercase font-semibold">
+                <th className="py-2.5 px-3">Name</th>
+                <th className="py-2.5 px-3">Budget</th>
+                <th className="py-2.5 px-3">Spent</th>
+                <th className="py-2.5 px-3">Remaining</th>
+                <th className="py-2.5 px-3">Extra</th>
+                <th className="py-2.5 px-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-850 text-xs">
+              {(summaryData.memberTable || []).map((m) => (
+                <tr key={m.userId} className="hover:bg-slate-900/40 transition-colors">
+                  <td className="py-3 px-3 flex items-center space-x-2">
+                    <img
+                      src={m.avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${m.name}`}
+                      alt="avatar"
+                      className="h-6 w-6 rounded-full bg-slate-800 border border-slate-700"
+                    />
+                    <span className="font-semibold text-slate-200">{m.name} {m.userId === user?._id ? '(You)' : ''}</span>
+                  </td>
+                  <td className="py-3 px-3 text-slate-350">₹{m.budget.toLocaleString('en-IN')}</td>
+                  <td className="py-3 px-3 text-slate-200 font-medium">₹{m.spent.toLocaleString('en-IN')}</td>
+                  <td className="py-3 px-3 text-emerald-450 font-medium">₹{m.remaining.toLocaleString('en-IN')}</td>
+                  <td className={`py-3 px-3 font-semibold ${m.extra > 0 ? 'text-danger-400' : 'text-slate-500'}`}>₹{m.extra.toLocaleString('en-IN')}</td>
+                  <td className="py-3 px-3">
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      m.status === 'Over Budget'
+                        ? 'bg-danger-500/10 border border-danger-500/20 text-danger-400'
+                        : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-455'
+                    }`}>
+                      {m.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {(!summaryData.memberTable || summaryData.memberTable.length === 0) && (
+                <tr>
+                  <td colSpan="6" className="py-6 text-center text-xs text-slate-500">No member statistics found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -335,8 +433,8 @@ const Dashboard = () => {
                     className="h-7 w-7 rounded-full bg-slate-800 mt-0.5 border border-slate-700"
                   />
                   <div>
-                    <p className="text-slate-200 font-medium">{act.details}</p>
-                    <p className="text-slate-500 text-[10px] mt-0.5">{new Date(act.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} • {new Date(act.createdAt).toLocaleDateString()}</p>
+                    <p className="text-slate-200 font-medium whitespace-pre-line">{act.details}</p>
+                    <p className="text-slate-500 text-[10px] mt-1">{new Date(act.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} • {new Date(act.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
               </div>
@@ -368,16 +466,16 @@ const Dashboard = () => {
               </div>
             )}
 
-            <form onSubmit={handleAddExpense} className="mt-4 space-y-4">
-              {/* Description */}
+            <form onSubmit={handleAddExpense} className="space-y-4 mt-4">
+              {/* Title Description */}
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Description / Title</label>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</label>
                 <input
                   type="text"
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 focus:border-brand-500 block w-full px-3 py-2 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-1"
+                  className="bg-slate-950 border border-slate-800 focus:border-brand-500 block w-full px-3 py-2 rounded-xl text-sm text-slate-100 placeholder-slate-650 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-1"
                   placeholder="e.g. Chicken & Eggs, Electricity bill"
                 />
               </div>
@@ -393,7 +491,7 @@ const Dashboard = () => {
                     required
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="bg-slate-950 border border-slate-800 focus:border-brand-500 block w-full px-3 py-2 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-1"
+                    className="bg-slate-950 border border-slate-800 focus:border-brand-500 block w-full px-3 py-2 rounded-xl text-sm text-slate-100 placeholder-slate-650 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-1"
                     placeholder="e.g. 850"
                   />
                 </div>
@@ -402,9 +500,9 @@ const Dashboard = () => {
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="bg-slate-950 border border-slate-800 focus:border-brand-500 block w-full px-3 py-2 rounded-xl text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-1"
+                    className="bg-slate-950 border border-slate-800 focus:border-brand-500 block w-full px-3 py-2.5 rounded-xl text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-1"
                   >
-                    {['Rent', 'Electricity', 'WiFi', 'Vegetables', 'Eggs', 'Chicken', 'Milk', 'Petrol', 'Water', 'Gas', 'Other'].map(cat => (
+                    {['Rent', 'Electricity', 'WiFi', 'Vegetables', 'Eggs', 'Chicken', 'Milk', 'Petrol', 'Gas', 'Other'].map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -417,7 +515,7 @@ const Dashboard = () => {
                 <select
                   value={paidBy}
                   onChange={(e) => setPaidBy(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 focus:border-brand-500 block w-full px-3 py-2 rounded-xl text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-1"
+                  className="bg-slate-950 border border-slate-800 focus:border-brand-500 block w-full px-3 py-2.5 rounded-xl text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-1"
                 >
                   {members.map(member => (
                     <option key={member._id} value={member._id}>{member.name} {member._id === user?._id ? '(You)' : ''}</option>

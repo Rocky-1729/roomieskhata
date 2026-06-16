@@ -20,6 +20,7 @@ import Settle from './pages/Settle';
 import Timeline from './pages/Timeline';
 import Members from './pages/Members';
 import Settings from './pages/Settings';
+import Analytics from './pages/Analytics';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,6 +58,7 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/expenses" element={<Expenses />} />
                 <Route path="/settle" element={<Settle />} />
+                <Route path="/analytics" element={<Analytics />} />
                 <Route path="/timeline" element={<Timeline />} />
                 <Route path="/members" element={<Members />} />
                 <Route path="/settings" element={<Settings />} />

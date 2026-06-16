@@ -15,7 +15,8 @@ import {
   Check, 
   Menu, 
   X,
-  Share2
+  Share2,
+  TrendingUp
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -95,6 +96,7 @@ const DashboardLayout = () => {
     { name: 'Dashboard', path: '/dashboard', icon: Home },
     { name: 'Expenses', path: '/expenses', icon: Receipt },
     { name: 'Settle Up', path: '/settle', icon: ArrowLeftRight },
+    { name: 'Analytics', path: '/analytics', icon: TrendingUp },
     { name: 'Timeline', path: '/timeline', icon: Activity },
     { name: 'Members', path: '/members', icon: Users },
     { name: 'Settings', path: '/settings', icon: Settings },

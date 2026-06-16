@@ -26,6 +26,22 @@ const RoomSchema = new mongoose.Schema({
     type: Number,
     default: 10,
   },
+  roomRent: {
+    type: Number,
+    default: 0,
+  },
+  monthlyContribution: {
+    type: Number,
+    default: 0,
+  },
+  rentSharePerPerson: {
+    type: Number,
+    default: 0,
+  },
+  allocatedBudget: {
+    type: Number,
+    default: 0,
+  },
 }, {
   timestamps: true,
 });

@@ -23,6 +23,7 @@ const ExpenseSchema = new mongoose.Schema({
       'Rent',
       'Electricity',
       'WiFi',
+      'Groceries',
       'Vegetables',
       'Eggs',
       'Chicken',

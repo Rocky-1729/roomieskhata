@@ -5,12 +5,21 @@ const ActivityLog = require('../models/ActivityLog');
 const Notification = require('../models/Notification');
 const generateRoomCode = require('../utils/generateRoomCode');
 
+const recalculateRoomBudgetHelper = async (roomId) => {
+  const room = await Room.findById(roomId);
+  if (!room) return;
+  
+  room.rentSharePerPerson = room.roomRent > 0 ? Math.round(room.roomRent / (room.maxMembers || 1)) : 0;
+  room.allocatedBudget = room.monthlyContribution || 0;
+  await room.save();
+};
+
 // @desc    Create a new room
 // @route   POST /api/v1/rooms
 // @access  Private
 const createRoom = async (req, res, next) => {
   try {
-    const { name, description, maxMembers } = req.body;
+    const { name, description, maxMembers, monthlyContribution, roomRent } = req.body;
 
     if (!name) {
       res.status(400);
@@ -26,12 +35,22 @@ const createRoom = async (req, res, next) => {
 
     const roomCode = await generateRoomCode();
 
+    const roommatesCount = parseInt(maxMembers) || 1;
+    const rentAmount = parseFloat(roomRent) || 0;
+    const contributionAmount = parseFloat(monthlyContribution) || 0;
+
+    const rentSharePerPerson = roommatesCount > 0 ? Math.round(rentAmount / roommatesCount) : 0;
+
     const room = await Room.create({
       name,
       description: description || '',
       roomCode,
       adminId: req.user.id,
-      maxMembers: maxMembers || 10,
+      maxMembers: roommatesCount,
+      roomRent: rentAmount,
+      monthlyContribution: contributionAmount,
+      rentSharePerPerson,
+      allocatedBudget: contributionAmount,
     });
 
     // Create RoomMember entry
@@ -106,6 +125,9 @@ const joinRoom = async (req, res, next) => {
     // Update User activeRoomId
     user.activeRoomId = room._id;
     await user.save();
+
+    // Recalculate per-person budget
+    await recalculateRoomBudgetHelper(room._id);
 
     // Notify other members
     const roomMembers = await RoomMember.find({ roomId: room._id, userId: { $ne: req.user.id } });
@@ -191,7 +213,7 @@ const getMyRoom = async (req, res, next) => {
 // @access  Private
 const updateRoom = async (req, res, next) => {
   try {
-    const { name, description, maxMembers } = req.body;
+    const { name, description, maxMembers, roomRent, monthlyContribution } = req.body;
 
     const user = await User.findById(req.user.id);
     if (!user.activeRoomId) {
@@ -213,13 +235,20 @@ const updateRoom = async (req, res, next) => {
 
     if (name) room.name = name;
     if (description !== undefined) room.description = description;
-    if (maxMembers) room.maxMembers = maxMembers;
+    if (maxMembers) room.maxMembers = parseInt(maxMembers);
+    if (roomRent !== undefined) room.roomRent = parseFloat(roomRent) || 0;
+    if (monthlyContribution !== undefined) room.monthlyContribution = parseFloat(monthlyContribution) || 0;
 
     await room.save();
 
+    // Recalculate per-person budget
+    await recalculateRoomBudgetHelper(room._id);
+
+    const updatedRoom = await Room.findById(room._id);
+
     res.json({
       success: true,
-      room,
+      room: updatedRoom,
     });
   } catch (error) {
     next(error);
@@ -283,6 +312,9 @@ const leaveRoom = async (req, res, next) => {
 
       // Remove RoomMember record
       await RoomMember.deleteOne({ roomId, userId: req.user.id });
+
+      // Recalculate room budget
+      await recalculateRoomBudgetHelper(roomId);
 
       // Notify remaining members
       const notifyMembers = members.filter(m => m.userId.toString() !== req.user.id.toString());
@@ -380,4 +412,5 @@ module.exports = {
   updateRoom,
   leaveRoom,
   deleteMyRoom,
+  recalculateRoomBudgetHelper,
 };

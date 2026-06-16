@@ -112,11 +112,37 @@ const createExpense = async (req, res, next) => {
 
     // Create activity log
     const payer = await User.findById(paidBy);
+    const Room = require('../models/Room');
+    const roomObj = await Room.findById(roomId);
+    
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    const endOfMonth = new Date();
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+    endOfMonth.setDate(0);
+    endOfMonth.setHours(23, 59, 59, 999);
+
+    const mongoose = require('mongoose');
+    const payerSpentResult = await Expense.aggregate([
+      {
+        $match: {
+          roomId: roomObj._id,
+          paidBy: new mongoose.Types.ObjectId(paidBy),
+          date: { $gte: startOfMonth, $lte: endOfMonth }
+        }
+      },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const payerSpent = payerSpentResult[0] ? payerSpentResult[0].total : 0;
+    const remainingBudget = (roomObj.allocatedBudget || 0) - (roomObj.rentSharePerPerson || 0) - payerSpent;
+
     const activityLog = await ActivityLog.create({
       roomId,
       userId: req.user.id,
       action: 'add_expense',
-      details: `${payer.name} added "${expense.title}" of ₹${expense.amount.toFixed(2)}`,
+      details: `${payer.name} added ${category} ₹${expense.amount.toFixed(0)}\nRemaining Budget ₹${remainingBudget.toFixed(0)}`,
     });
 
     // Create Notifications
@@ -299,11 +325,37 @@ const updateExpense = async (req, res, next) => {
     const updatedBalances = await calculateBalances(expense.roomId);
 
     // Create activity log
+    const Room = require('../models/Room');
+    const roomObj = await Room.findById(expense.roomId);
+    
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    const endOfMonth = new Date();
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+    endOfMonth.setDate(0);
+    endOfMonth.setHours(23, 59, 59, 999);
+
+    const mongoose = require('mongoose');
+    const payerSpentResult = await Expense.aggregate([
+      {
+        $match: {
+          roomId: roomObj._id,
+          paidBy: new mongoose.Types.ObjectId(expense.paidBy._id || expense.paidBy),
+          date: { $gte: startOfMonth, $lte: endOfMonth }
+        }
+      },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const payerSpent = payerSpentResult[0] ? payerSpentResult[0].total : 0;
+    const remainingBudget = (roomObj.allocatedBudget || 0) - (roomObj.rentSharePerPerson || 0) - payerSpent;
+
     const activityLog = await ActivityLog.create({
       roomId: expense.roomId,
       userId: req.user.id,
       action: 'update_expense',
-      details: `${req.user.name} updated the expense "${expense.title}"`,
+      details: `${req.user.name} updated the expense "${expense.title}"\nRemaining Budget ₹${remainingBudget.toFixed(0)}`,
     });
 
     // Broadcast Socket Event
@@ -362,11 +414,37 @@ const deleteExpense = async (req, res, next) => {
     const updatedBalances = await calculateBalances(roomId);
 
     // Create activity log
+    const Room = require('../models/Room');
+    const roomObj = await Room.findById(roomId);
+    
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    const endOfMonth = new Date();
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+    endOfMonth.setDate(0);
+    endOfMonth.setHours(23, 59, 59, 999);
+
+    const mongoose = require('mongoose');
+    const payerSpentResult = await Expense.aggregate([
+      {
+        $match: {
+          roomId: roomObj._id,
+          paidBy: new mongoose.Types.ObjectId(expense.paidBy),
+          date: { $gte: startOfMonth, $lte: endOfMonth }
+        }
+      },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const payerSpent = payerSpentResult[0] ? payerSpentResult[0].total : 0;
+    const remainingBudget = (roomObj.allocatedBudget || 0) - (roomObj.rentSharePerPerson || 0) - payerSpent;
+
     const activityLog = await ActivityLog.create({
       roomId,
       userId: req.user.id,
       action: 'delete_expense',
-      details: `${req.user.name} deleted the expense "${expense.title}" (₹${expense.amount})`,
+      details: `${req.user.name} deleted the expense "${expense.title}"\nRemaining Budget ₹${remainingBudget.toFixed(0)}`,
     });
 
     // Broadcast Socket Event

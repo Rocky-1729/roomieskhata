@@ -60,7 +60,7 @@ const Timeline = () => {
                     className="h-8 w-8 rounded-full bg-slate-800 border border-slate-700"
                   />
                   <div>
-                    <p className="text-slate-200 font-medium leading-relaxed">{act.details}</p>
+                    <p className="text-slate-200 font-medium leading-relaxed whitespace-pre-line">{act.details}</p>
                     <div className="flex items-center space-x-1.5 text-slate-500 text-[10px] mt-1">
                       <Clock className="h-3 w-3" />
                       <span>
