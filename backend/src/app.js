@@ -15,12 +15,20 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const app = express();
 
 // Configure CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://roomieskhata.vercel.app'
+];
+
 app.use(
   cors({
-    origin: [
-      'http://localhost:5173',
-      process.env.FRONTEND_URL,
-    ],
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   })
 );
