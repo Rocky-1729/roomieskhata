@@ -17,15 +17,27 @@ const app = express();
 // Configure CORS
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://roomieskhata.vercel.app'
-];
+  'http://localhost:3000',
+  process.env.FRONTEND_URL
+].filter(Boolean);
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+
+      const isAllowed = 
+        allowedOrigins.includes(origin) || 
+        origin.endsWith('.vercel.app') || 
+        origin.endsWith('.netlify.app') ||
+        origin === 'https://vercel.app' ||
+        origin === 'https://netlify.app';
+
+      if (isAllowed) {
         callback(null, true);
       } else {
+        console.warn(`CORS blocked request from origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
